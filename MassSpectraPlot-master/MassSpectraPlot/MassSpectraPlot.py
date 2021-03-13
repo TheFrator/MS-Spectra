@@ -1,3 +1,8 @@
+
+# %%
+
+
+
 import pandas as pd
 import numpy as np
 import math as mt
@@ -30,8 +35,8 @@ params = {'backend': 'pdf',
           'xtick.labelsize': 8,
           'ytick.labelsize': 8,
           'font.family': 'serif',
-          'text.usetex': True,
-          'text.latex.unicode': True,
+          'text.usetex': False,
+          #'text.latex.unicode': False, #Depreciated parameter in Matplot version > 2.2
           'axes.linewidth': 0.5,
           'xtick.major.size': 4,  # major tick size in points
           'xtick.minor.size': 2,  # minor tick size in points
@@ -256,28 +261,29 @@ def generate_massspectra_plot_automatic_labels(input_filename, output_filename):
     plotheight_mm = plotwidth_mm * 0.8
 
     hspace_mm = 0.1  # horizontal space between two plots
-
+#Line of code I will need to change
     # read xy input data
-    raw_values = pd.read_csv(input_filename + ".xy", sep=" ", names=["m/z", "intensity"],
+    raw_values = pd.read_csv(input_filename + '.csv', sep = ',', names=["m/z", "intensity"],
                              dtype={"m/z": np.float64, "intensity": np.float64})
     # normalize input data
     max_val = np.max(raw_values['intensity'])
     raw_values["intensity_normalized"] = raw_values['intensity'] / max_val * 100.0  # normalize intensity to percent
-
+    raw_values['m/z'] = np.round(raw_values['m/z'],decimals=1)
+    raw_values = raw_values.groupby(by='m/z').mean().reset_index()
+    
     # read txt captions
     caption_values = pd.read_csv(input_filename + ".txt", sep=";", names=["m/z", "caption"], dtype={"m/z": np.float64})
 
     # find maximum value for each annotate peak - necessary for later calculation of annotation lines
+    
     for i in caption_values.index:
-        raw_values_index = raw_values[raw_values["m/z"] == caption_values.ix[i]["m/z"]].index[0]
-        value, index = float(raw_values.loc[raw_values_index - 5, "intensity_normalized"]), raw_values_index - 5
 
-        for z in range(-5, 15):
-            if float(raw_values.loc[raw_values_index + z, "intensity_normalized"]) > value:
-                value, index = float(raw_values.loc[raw_values_index + z, "intensity_normalized"]), raw_values_index + z
+        raw_values.loc[caption_values.index[i]]
+        #I need to get the intensity of the caption peak !!!
 
-        caption_values.loc[i, "m/z"] = float(raw_values.loc[index, "m/z"])
-        caption_values.loc[i, "intensity_normalized"] = value  # add intensity to caption table
+
+
+
 
     # dimension for the annotations in pixel
     delta_x_text_labels_mm = 3.8
@@ -418,238 +424,7 @@ def generate_massspectra_plot_automatic_labels(input_filename, output_filename):
     plt.close()
 
 
-def generate_massspectra_plot_distance_peak_manual_annotation(input_filename, output_filename):
-    print("Generate {0} mass spectra plot ({1}.{2}) from {3}.[xy/txt]".format(filetype.upper(), output_filename,
-                                                                              filetype, input_filename))
-
-    # min and max value of the x axis
-    min_xaxis = 100
-    max_xaxis = 450
-
-    # dimensions of the single plot
-    figwidth_mm = 141
-    left_margin_mm = 14
-    right_margin_mm = 2
-    top_margin_mm = 5
-    bottom_margin_mm = 13
-
-    plotwidth_mm = figwidth_mm - left_margin_mm - right_margin_mm
-    plotheight_mm = plotwidth_mm * 0.8
-
-    hspace_mm = 0.1  # horizontal space between two plots
-
-    # read xy input data
-    raw_values = pd.read_csv(input_filename + ".xy", sep=" ", names=["m/z", "intensity"],
-                             dtype={"m/z": np.float64, "intensity": np.float64})
-    # normalize input data
-    max_val = np.max(raw_values['intensity'])
-    raw_values["intensity_normalized"] = raw_values['intensity'] / max_val * 100.0  # normalize intensity to percent
-
-    fsize, margins = __figsize_and_margins(plotsize=(__conv_inch(plotwidth_mm), __conv_inch(plotheight_mm)),
-                                           subplots=(1, 1),
-                                           left=__conv_inch(left_margin_mm), right=__conv_inch(right_margin_mm),
-                                           top=__conv_inch(top_margin_mm), bottom=__conv_inch(bottom_margin_mm),
-                                           wspace=0.01, hspace=__conv_inch(hspace_mm))
-    fig = plt.figure(figsize=fsize, )
-    plt.subplots_adjust(**margins)
-    ax = fig.add_subplot(111)
-
-    # plot spectra line
-    ax.plot(raw_values["m/z"], raw_values["intensity_normalized"], color="black", linewidth=0.8)
-
-    # set x axes range
-    if min_xaxis is not None and max_xaxis is not None:
-        ax.set_xlim([int(min_xaxis), int(max_xaxis)])
-
-    # annotations
-    # length in data value (in %)
-    annotate_point(403, 83, r'Peak II', raw_values)
-    annotate_point(253, 83, r'Peak I', raw_values)
-
-    annotate_distance(385, 403, 45, '$-18$', raw_values, rotate_text=90)
-    annotate_distance(367, 385, 45, '$-18$', raw_values, rotate_text=90)
-    annotate_distance(339, 367, 25, '$xy$', raw_values, rotate_text=90)
-    annotate_distance(321, 349, 35, '$xy$', raw_values, rotate_text=90)
-    annotate_distance(253, 349, 72, '$-96$', raw_values)
-
-    # remove top and right axis
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-
-    # label axes
-    ax.set_xlabel(r"$m/z$")
-    ax.set_ylabel(r"$Intensity\,[\%]$")
-
-    # set x labels
-    plt.xticks(rotation='vertical')
-    start, end = ax.get_xlim()
-    ax.xaxis.set_ticks(np.arange(start, end + 1, 25))
-
-    # set y labels
-    ax.set_ylim(0, 100)
-    start, end = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(start, end + 1, 10))
-
-    # set grid
-    plt.grid(True, axis="y", color='black', linestyle=':', linewidth=0.1)
-
-    plt.savefig(output_filename + "." + filetype, dpi=fig.dpi, format=filetype)
-    plt.close()
-
-
-def generate_massspectra_two_plot_manual_annotation(input_filename1, input_filename2, output_filename):
-    print("Generate {0} mass spectra plot ({1}.{2}) from {3}.xy and {4}.xy".format(filetype.upper(), output_filename,
-                                                                                   filetype, input_filename1,
-                                                                                   input_filename2))
-
-    # min and max value of the x axis
-    min_xaxis = 50
-    max_xaxis = 475
-
-    # labels
-    label1 = "Substance 1"
-    label2 = "Substance 2"
-
-    # dimensions of the single plot
-    figwidth_mm = 141
-    left_margin_mm = 14
-    right_margin_mm = 2
-    top_margin_mm = 5
-    bottom_margin_mm = 13
-
-    plotwidth_mm = figwidth_mm - left_margin_mm - right_margin_mm
-    plotheight_mm = plotwidth_mm * 0.8
-
-    hspace_mm = 25  # horizontal space between two plots
-
-    # read xy input data
-    raw_values1 = pd.read_csv(input_filename1 + ".xy", sep=" ", names=["m/z", "intensity"],
-                              dtype={"m/z": np.float64, "intensity": np.float64})
-    # normalize input data
-    max_val = np.max(raw_values1['intensity'])
-    raw_values1["intensity_normalized"] = raw_values1['intensity'] / max_val * 100.0  # normalize intensity to percent
-
-    # read xy input data
-    raw_values2 = pd.read_csv(input_filename2 + ".xy", sep=" ", names=["m/z", "intensity"],
-                              dtype={"m/z": np.float64, "intensity": np.float64})
-    # normalize input data
-    max_val = np.max(raw_values2['intensity'])
-    raw_values2["intensity_normalized"] = raw_values2['intensity'] / max_val * 100.0  # normalize intensity to percent
-
-    fsize, margins = __figsize_and_margins(plotsize=(__conv_inch(plotwidth_mm), __conv_inch(plotheight_mm)),
-                                           subplots=(1, 1),
-                                           left=__conv_inch(left_margin_mm), right=__conv_inch(right_margin_mm),
-                                           top=__conv_inch(top_margin_mm), bottom=__conv_inch(bottom_margin_mm),
-                                           wspace=0.01, hspace=__conv_inch(hspace_mm))
-    fig = plt.figure(figsize=fsize, )
-    plt.subplots_adjust(**margins)
-
-    ax = fig.add_subplot(211)
-
-    # plot spectra line
-    plt1, = ax.plot(raw_values1["m/z"], raw_values1["intensity_normalized"], color="black", linewidth=0.8, label=label1)
-    legend = plt.legend(handles=[plt1], loc=2)
-    legend.get_frame().set_linewidth(0)
-
-    # set x axes range
-    if min_xaxis is not None and max_xaxis is not None:
-        ax.set_xlim([int(min_xaxis), int(max_xaxis)])
-
-    # annotate plot1
-    annotate_point(253, 60, r'Peak 1', raw_values1)
-    annotate_distance(385, 403, 45, r'$-18$', raw_values1, rotate_text=90)
-    annotate_distance(367, 385, 45, r'$-18$', raw_values1, rotate_text=90)
-    annotate_distance(321, 349, 75, r'$xy$', raw_values1, rotate_text=0)
-    annotate_point(403, 60, r'Peak 2', raw_values1)
-
-    # remove top and right axis
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-
-    # label axes
-    ax.set_ylabel(r"$Intensity\,[\%]$")
-
-    # set x labels
-    plt.xticks(rotation='vertical')
-    start, end = ax.get_xlim()
-    ax.xaxis.set_ticks(np.arange(start, end + 1, 25))
-
-    # set y labels
-    ax.set_ylim(0, 100)
-    start, end = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(start, end + 1, 10))
-
-    # set grid
-    plt.grid(True, axis="y", color='black', linestyle=':', linewidth=0.1)
-
-    # set x labels
-    plt.xticks(rotation='vertical')
-    start, end = ax.get_xlim()
-    ax.xaxis.set_ticks(np.arange(start, end + 1, 25))
-    # set y labels
-    ax.set_ylim(0, 100)
-    start, end = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(start, end + 1, 10))
-    # set grid
-    plt.grid(True, axis="y", color='black', linestyle=':', linewidth=0.1)
-
-    # generate plot2
-    ax = fig.add_subplot(212)
-
-    plt2, = ax.plot(raw_values2["m/z"], raw_values2["intensity_normalized"], color="#606060", linewidth=0.8,
-                    label=label2)
-    legend = plt.legend(handles=[plt2], loc=2)
-    legend.get_frame().set_linewidth(0)
-
-    # set x axes range
-    if min_xaxis is not None and max_xaxis is not None:
-        ax.set_xlim([int(min_xaxis), int(max_xaxis)])
-
-    # annotate
-    annotate_point(253, 60, r'Peak I', raw_values2)
-    annotate_point(189, 60, r'189', raw_values2)
-    annotate_point(215, 60, r'215', raw_values2)
-    annotate_distance(385, 445, 30, r'Multiple'"\n"r'line'"\n"'annotation', raw_values2)
-    annotate_distance(367, 385, 45, r' -18', raw_values2, rotate_text=90)
-    annotate_distance(349, 367, 45, r' -18', raw_values2, rotate_text=90)
-    annotate_distance(321, 349, 75, r'xy', raw_values2, rotate_text=0)
-    annotate_point(445, 60, r'Peak 2', raw_values2)
-
-    # remove top and right axis
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.get_xaxis().tick_bottom()
-    ax.get_yaxis().tick_left()
-
-    # label axes
-    ax.set_xlabel(r"$m/z$")
-    ax.set_ylabel(r"$Intensity\,[\%]$")
-
-    # set x labels
-    plt.xticks(rotation='vertical')
-    start, end = ax.get_xlim()
-    ax.xaxis.set_ticks(np.arange(start, end + 1, 25))
-
-    # set y labels
-    ax.set_ylim(0, 100)
-    start, end = ax.get_ylim()
-    ax.yaxis.set_ticks(np.arange(start, end + 1, 10))
-
-    # set grid
-    plt.grid(True, axis="y", color='black', linestyle=':', linewidth=0.1)
-
-    plt.savefig(output_filename + "." + filetype, dpi=fig.dpi, format=filetype)
-    plt.close()
-
+# %%
 
 if __name__ == "__main__":
-    generate_massspectra_plot_automatic_labels("../examples/inputs/substance1", "../examples/ex1")
-
-    generate_massspectra_plot_distance_peak_manual_annotation("../examples/inputs/substance2", "../examples/ex2")
-
-    generate_massspectra_two_plot_manual_annotation("../examples/inputs/substance1",
-                                                    "../examples/inputs/substance2", "../examples/ex3")
+    generate_massspectra_plot_automatic_labels("../examples/inputs/test", "../examples/test1")
